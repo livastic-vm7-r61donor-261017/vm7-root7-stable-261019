@@ -1,0 +1,9 @@
+pull_request_rules:
+  - name: VM7 root7 custom-default non-stable gate 261019
+    conditions:
+      - base = stable
+      - head != stable
+      - check-success = vm7-root7-stable-prevention-261019
+    actions:
+      merge:
+        method: squash

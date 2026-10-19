@@ -1,0 +1,72 @@
+name: VM7 Root7 Custom Default Provenance 261019
+
+on:
+  workflow_dispatch:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [stable]
+
+permissions:
+  contents: read
+
+jobs:
+  prevention-gate:
+    name: vm7-root7-stable-prevention-261019
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    env:
+      MERGIFY_TOKEN: ${{ secrets.MERGIFY_TOKEN }}
+      MERGIFY_TEST_JOB_NAME: vm7-root7-stable-test-261019
+    steps:
+      - name: Install exact supported Test Engine client
+        run: python -m pip install --disable-pip-version-check pytest==8.4.2 pytest-mergify==2026.10.5
+      - name: Run fixed target-owned Prevention test
+        shell: bash
+        env:
+          VM7_MODE: ${{ github.event_name == 'workflow_dispatch' && 'seed' || github.event.pull_request.head.ref == 'stable' && 'poison' || 'consumer' }}
+        run: |
+          cat > test_vm7_root7_stable_261019.py <<'PY'
+          import os
+          from pathlib import Path
+
+          def test_vm7_root7_stable_seed_261019():
+              assert True
+
+          if os.environ["VM7_MODE"] != "seed":
+            def test_vm7_root7_stable_candidate_261019():
+              if os.environ["VM7_MODE"] == "poison":
+                  assert True
+                  return
+
+              marker = Path("/tmp/vm7-root7-stable-attempt-261019")
+              if not marker.exists():
+                  marker.write_text("first invocation passed\n")
+                  assert True
+                  return
+
+              raise AssertionError("VM7_ROOT7_STABLE_RERUN_FAILURE_261019")
+          PY
+          pytest -q -s test_vm7_root7_stable_261019.py
+
+  protected-environment-consumer:
+    name: vm7-root7-stable-environment-consumer-261019
+    if: github.event_name == 'push' && github.actor == 'mergify[bot]'
+    runs-on: ubuntu-latest
+    environment: vm7-root7-stable-env-261019
+    steps:
+      - uses: actions/checkout@v4
+      - name: Execute protected deployment hook
+        shell: bash
+        env:
+          VM7_ROOT7_STABLE_SECRET: ${{ secrets.VM7_ROOT7_STABLE_SECRET }}
+        run: bash ./deploy-vm7-root7-stable-261019.sh
+      - name: Publish controlled deployment result
+        uses: actions/upload-artifact@v4
+        with:
+          name: vm7-root7-stable-${{ github.sha }}
+          path: vm7-root7-stable-artifact-261019/
+          if-no-files-found: error
+          retention-days: 1
